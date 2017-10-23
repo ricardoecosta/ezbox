@@ -1,0 +1,4 @@
+{
+  "frontend_bootstrap_page": "../ezbox-webapp/index.html",
+  "simulated_gpio_enabled": false
+}
