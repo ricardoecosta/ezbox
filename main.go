@@ -1,17 +1,22 @@
 package main
 
+// todo: use errors package everywhere
+
 import (
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 
 	"time"
 
+	"fmt"
+
 	"github.com/gorilla/websocket"
-	"github.com/ricardoecosta/ezbox/config"
 	"github.com/ricardoecosta/ezbox/gpio"
+	"github.com/ricardoecosta/ezbox/media"
 	"github.com/ricardoecosta/ezbox/session"
 )
 
@@ -21,32 +26,46 @@ var (
 )
 
 func main() {
-	serverConfig := config.Load("conf.json")
+	config := LoadConfig("conf.json")
 	go waitForGracefulShutdownSignal()
 
-	stream := gpio.SubscribeToGpioStream(serverConfig.SimulatedGPIOEnabled)
+	media.InitPlayer("") // todo: read from config
+	media.InitCollection(config.MediaDirectories)
+	media.PrintIndexedMediaCollection()
+
+	pins := FlattenedPins(config.Controls)
+	stream := gpio.Stream(pins)
+
 	go func() {
 		for pin := range stream {
-			m := NewPinUpdatedMessage(pin)
+
+			// todo
+			m := NewChannelChangedMessage(
+				"channel "+strconv.Itoa(int(pin.Number)),
+				strconv.Itoa(int(pin.Value)),
+				"")
+
+			log.Printf("pin update, number=%v value=%v", pin.Number, pin.Value)
 			session.BroadcastMessageToSessions(m)
 		}
 	}()
 
-	// serve frontend
-	http.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
-		http.ServeFile(writer, request, serverConfig.FrontendBootstrapPage)
-	})
+	// frontend file server
+	http.Handle("/", http.FileServer(http.Dir(config.FrontendRoot)))
 
-	// websocket connection establishment
+	// websocket endpoint
 	http.HandleFunc("/ws", func(writer http.ResponseWriter, request *http.Request) {
 		conn, err := upgrader.Upgrade(writer, request, nil)
 		if err != nil {
 			log.Println("error upgrading websockets", err)
+			return
 		}
 
 		session.NewSession(request.Header.Get("sec-websocket-key"), conn)
 	})
-	log.Fatal(http.ListenAndServe(":8765", nil))
+
+	log.Printf("http server listening, port=%v", config.Port)
+	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", config.Port), nil))
 }
 
 func waitForGracefulShutdownSignal() {

@@ -2,12 +2,9 @@ package gpio
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"strconv"
-	"sync"
-
-	"log"
-
 	"strings"
 
 	"github.com/fsnotify/fsnotify"
@@ -23,15 +20,9 @@ const (
 )
 
 var (
-	stream        chan Pin
-	simulatedGPIO gpioMap
-	watchedPins   = make(map[string]Pin)
+	stream      chan Pin
+	watchedPins = make(map[string]Pin)
 )
-
-type gpioMap struct {
-	pins  map[uint8]Pin
-	mutex sync.Mutex
-}
 
 type Pin struct {
 	Number        uint8 `json:"number"`
@@ -39,34 +30,20 @@ type Pin struct {
 	valueFileName string
 }
 
-func SetSimulatedGpio(pin Pin) {
-	simulatedGPIO.mutex.Lock()
-	defer simulatedGPIO.mutex.Unlock()
-
-	simulatedGPIO.pins[pin.Number] = pin
-	stream <- pin
-}
-
-func SubscribeToGpioStream(simulatedGPIOEnabled bool) <-chan Pin {
-	stream = make(chan Pin, 1)
-	if simulatedGPIOEnabled {
-		simulatedGPIO = gpioMap{pins: make(map[uint8]Pin)}
-		// todo: setup SimulatePinUpdate message handler
-	} else {
-		// todo: read from config file
-		go watchPins(2)
-	}
+func Stream(pins []uint8) <-chan Pin {
+	stream = make(chan Pin)
+	go watch(pins)
 	return stream
 }
 
-func watchPins(pinNumbers ...uint8) error {
+func watch(pins []uint8) error {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		return errors.WithMessage(err, "unable to create fs watcher")
 	}
 	defer watcher.Close()
 
-	for _, n := range pinNumbers {
+	for _, n := range pins {
 		pin := Pin{Number: n, valueFileName: pinValueFileName(n)}
 		watchedPins[pin.valueFileName] = pin
 		pin.watch(watcher)
@@ -80,8 +57,7 @@ func watchPins(pinNumbers ...uint8) error {
 					fileName := event.Name
 					if strings.HasSuffix(fileName, "/value") {
 						pin := watchedPins[fileName]
-
-						file, err := openFileInReadMode(fileName)
+						file, err := openFileInReadOnlyMode(fileName)
 						if err != nil {
 							log.Printf("unable to open pin value file in read mode, pin=%v err=%v", pin.Number, err)
 						}
@@ -100,9 +76,6 @@ func watchPins(pinNumbers ...uint8) error {
 						stream <- Pin{Number: pin.Number, Value: uint8(val)}
 					}
 				}
-			case err := <-watcher.Errors:
-				// todo: this can produce lots of errors
-				log.Println("error:", err)
 			}
 		}
 	}()
@@ -151,7 +124,8 @@ func (p Pin) watch(fileWatcher *fsnotify.Watcher) error {
 	return nil
 }
 
-// todo: unexport?
+// TODO: unexport?
+
 func export(pin Pin) error {
 	return writePinNumberToFile(PinExportFileName, pin)
 }
@@ -173,7 +147,7 @@ func writePinNumberToFile(fileName string, pin Pin) error {
 }
 
 func writeStringToFile(fileName string, str string) error {
-	file, err := openFileInWriteMode(fileName)
+	file, err := openFileInWriteOnlyMode(fileName)
 	if err != nil {
 		message := fmt.Sprintf("unable to write string to file, file=%v string=%v", fileName, str)
 		errors.WithMessage(err, message)
@@ -199,11 +173,11 @@ func canOpenFileWithFlagAndPerm(fileName string, flag int, perm os.FileMode) (bo
 	return true, nil
 }
 
-func openFileInReadMode(fileName string) (*os.File, error) {
+func openFileInReadOnlyMode(fileName string) (*os.File, error) {
 	return os.OpenFile(fileName, os.O_RDONLY, 0400)
 }
 
-func openFileInWriteMode(fileName string) (*os.File, error) {
+func openFileInWriteOnlyMode(fileName string) (*os.File, error) {
 	return os.OpenFile(fileName, os.O_WRONLY, 0600)
 }
 

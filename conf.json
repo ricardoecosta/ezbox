@@ -1,4 +1,96 @@
 {
-  "frontend_bootstrap_page": "../ezbox-webapp/index.html",
-  "simulated_gpio_enabled": false
+  "port": 8765,
+  "frontendRoot": "../ezbox-webapp",
+  "channels": [
+    {
+      "id": "ch1",
+      "name": "Quim Barreiros",
+      "animatedGifDir": "."
+    },
+    {
+      "id": "ch2",
+      "name": "Canal de Música",
+      "animatedGifDir": "."
+    },
+    {
+      "id": "ch3",
+      "name": "Canal de Comédia",
+      "animatedGifDir": "."
+    },
+    {
+      "id": "ch4",
+      "name": "Canal de Filmes",
+      "animatedGifDir": "."
+    }
+  ],
+  "controls": [
+    {
+      "control": "test",
+      "type": "test",
+      "pins": [
+        1,
+        2,
+        16,
+        20
+      ]
+    },
+    {
+      "channelId": "ch1",
+      "type": "switch",
+      "pins": [
+        2
+      ]
+    },
+    {
+      "control": "ch2",
+      "type": "switch",
+      "pins": [
+        3
+      ]
+    },
+    {
+      "control": "ch3",
+      "type": "switch",
+      "pins": [
+        4
+      ]
+    },
+    {
+      "control": "ch4",
+      "type": "switch",
+      "pins": [
+        17
+      ]
+    },
+    {
+      "control": "previous",
+      "type": "rotary-encoder-left",
+      "pins": [
+        20,
+        12
+      ]
+    },
+    {
+      "control": "next",
+      "type": "rotary-encoder-right",
+      "pins": [
+        20,
+        12
+      ]
+    },
+    {
+      "control": "start/stop",
+      "type": "switch",
+      "pins": [
+        2
+      ]
+    },
+    {
+      "control": "shutdown",
+      "type": "switch",
+      "pins": [
+        16
+      ]
+    }
+  ]
 }

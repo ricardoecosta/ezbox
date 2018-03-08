@@ -1,6 +1,7 @@
 package session
 
 import (
+	"encoding/json"
 	"log"
 
 	"time"
@@ -77,5 +78,7 @@ func (s session) close() {
 }
 
 func (s session) sendMessage(m interface{}) error {
+	msg, _ := json.Marshal(m)
+	log.Printf("sending message to client: %s", string(msg))
 	return s.ws.conn.WriteJSON(m)
 }
